@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// Header of the drum pattern
 type Header struct {
 	_       [14]byte
 	Version [32]byte
@@ -25,6 +26,7 @@ func (h Header) String() string {
 	)
 }
 
+// Tempo of the drum pattern
 type Tempo struct {
 	Tempo float32
 }
@@ -34,24 +36,28 @@ func (t Tempo) String() string {
 	return fmt.Sprintf("Tempo: %s\n", tempo)
 }
 
+// TrackHeader is the header for a track.
 type TrackHeader struct {
-	Id         uint8
+	ID         uint8
 	NameLength uint32
 }
 
-type Steps struct {
+// Measure of a track.
+// Each measure has 16 steps.
+type Measure struct {
 	Steps [16]byte
 }
 
+// Track with the ID, Name, and formatted steps.
 type Track struct {
-	Id    uint8
+	ID    uint8
 	Name  string
 	Steps string
 }
 
 func (t Track) String() string {
 	return fmt.Sprintf("(%d) %s\t|%s|%s|%s|%s|\n",
-		t.Id,
+		t.ID,
 		string(t.Name),
 		t.Steps[0:4],
 		t.Steps[4:8],
@@ -99,8 +105,8 @@ func decodeTracks(buffer *bytes.Buffer) string {
 		trackName := make([]byte, trackHeader.NameLength)
 		buffer.Read(trackName)
 
-		s := Steps{}
-		err = binary.Read(buffer, binary.BigEndian, &s)
+		measure := Measure{}
+		err = binary.Read(buffer, binary.BigEndian, &measure)
 		if err == io.EOF {
 			break
 		}
@@ -108,19 +114,23 @@ func decodeTracks(buffer *bytes.Buffer) string {
 			fmt.Print("Steps: binary.Read failed:", err)
 		}
 
-		beats := fmtBeats(s.Steps)
-		track := Track{trackHeader.Id, string(trackName), beats}
+		beats := fmtBeats(measure.Steps)
+		track := Track{trackHeader.ID, string(trackName), beats}
 		allTracks = fmt.Sprintf(`%s%s`, allTracks, track)
 	}
 	return allTracks
 }
 
+// fmtBeats converts binary representation of the 16 step measure
+// pattern into a visualization showing when sound is triggered
 func fmtBeats(steps [16]byte) string {
 	beats := ""
 	for i := 0; i < 16; i++ {
 		if steps[i] == 1 {
+			// "x" represents sound output being triggered in a step
 			beats += "x"
 		} else {
+			// "-" represents no sound output being triggered in a step
 			beats += "-"
 		}
 	}
