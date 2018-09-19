@@ -14,10 +14,11 @@ type Pattern struct {
 	Tracks string
 }
 
+// String formats the return of the string
+// method for the Patter struct.
 func (p Pattern) String() string {
-	return fmt.Sprintf("%s\n%s\n%s",
+	return fmt.Sprintf("%s\n%s",
 		p.Header,
-		p.Tempo,
 		p.Tracks,
 	)
 }
@@ -37,27 +38,27 @@ func DecodeFile(path string) (*Pattern, error) {
 		return nil, fmt.Errorf("os.Stat failed: %v", err)
 	}
 
-	size := fi.Size()
-	fileBytes, err := readNextBytes(fd, int(size))
+	fileBytes, err := readNextBytes(fd, int(fi.Size()))
 	if err != nil {
 		return nil, fmt.Errorf("readNextByte failed: %v", err)
 	}
 
 	buffer := bytes.NewBuffer(fileBytes)
 
-	header, tempo, err := decodeHeader(buffer)
+	drumHeader, err := decodeHeader(buffer)
 	if err != nil {
 		return nil, fmt.Errorf("decodeHeader failed: %v", err)
 	}
+
 	allTracks, err := decodeTracks(buffer)
 	if err != nil {
 		return nil, fmt.Errorf("decodeTracks failed: %v", err)
 	}
 
 	p := Pattern{
-		Header: header,
-		Tempo:  tempo,
+		Header: drumHeader,
 		Tracks: allTracks,
 	}
+
 	return &p, nil
 }

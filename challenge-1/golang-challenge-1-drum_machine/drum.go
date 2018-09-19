@@ -1,4 +1,4 @@
-// Package drum is supposed to implement the decoding of .splice drum machine files.
+// Package drum is implements the decoding of .splice drum machine files.
 // See golang-challenge.com/go-challenge1/ for more information
 package drum
 
@@ -11,29 +11,33 @@ import (
 	"strings"
 )
 
-// Header is the representation of
-// the header of the drum pattern
-// describing the format and version
+// DrumHeader is the representation of the header of 
+// the drum pattern describing the version and tempo.
+type DrumHeader struct {
+	Version [32]byte
+	Tempo float32
+}
+
+// String formats the return of the string
+// method for the DrumHeader struct.
+func (d DrumHeader) String() string {
+	return fmt.Sprintf("Saved with HW Version: %s\nTempo: %s",
+		bytes.Trim(d.Version[:], "\x00"),
+		strings.TrimSuffix(fmt.Sprintf("%.1f", d.Tempo), ".0"),
+	)
+}
+
+// Header is the representation of the header of 
+// the drum pattern describing the format and version.
 type Header struct {
 	Format  [14]byte
 	Version [32]byte
 }
 
-func (h Header) String() string {
-	return fmt.Sprintf("Saved with HW Version: %s",
-		bytes.Trim(h.Version[:], "\x00"),
-	)
-}
-
 // Tempo is the representation of
-// the tempo of the drum pattern
+// the tempo of the drum pattern.
 type Tempo struct {
 	Tempo float32
-}
-
-func (t Tempo) String() string {
-	tempo := strings.TrimSuffix(fmt.Sprintf("%.1f", t.Tempo), ".0")
-	return fmt.Sprintf("Tempo: %s", tempo)
 }
 
 // TrackHeader is the representation of
@@ -43,9 +47,8 @@ type TrackHeader struct {
 	NameLength uint32
 }
 
-// Measure is the representation of
-// a measure in a drum pattern.
-// Each measure has 16 steps.
+// Measure is the representation of a measure in
+// a drum pattern. Each measure has 16 steps.
 type Measure struct {
 	Steps [16]byte
 }
@@ -58,6 +61,8 @@ type Track struct {
 	Steps string
 }
 
+// String formats the return of the string
+// method for the Track struct.
 func (t Track) String() string {
 	return fmt.Sprintf("(%d) %s\t|%s|%s|%s|%s|\n",
 		t.ID,
@@ -69,6 +74,7 @@ func (t Track) String() string {
 	)
 }
 
+// readNextBytes reads the number of bytes from the file.
 func readNextBytes(file *os.File, number int) ([]byte, error) {
 	bytes := make([]byte, number)
 	if _, err := file.Read(bytes); err != nil {
@@ -77,27 +83,37 @@ func readNextBytes(file *os.File, number int) ([]byte, error) {
 	return bytes, nil
 }
 
-func decodeHeader(buffer *bytes.Buffer) (string, string, error) {
-	var h = Header{}
+// decodeHeader decodes the header of the track
+// all tracks into a single string.
+func decodeHeader(buffer *bytes.Buffer) (string, error) {
+	var h Header
 	if err := binary.Read(buffer, binary.BigEndian, &h); err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	var t = Tempo{}
+	var t Tempo
 	if err := binary.Read(buffer, binary.LittleEndian, &t); err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	return fmt.Sprint(h), fmt.Sprint(t), nil
+	var d = DrumHeader{
+		Version: h.Version,
+		Tempo: t.Tempo,
+	}
+
+	return fmt.Sprint(d), nil
 }
 
+
+// decodeTracks decodes each track and appends
+// all tracks into a single string.
 func decodeTracks(buffer *bytes.Buffer) (string, error) {
-	var allTracks = ""
+	var allTracks bytes.Buffer
 	for {
-		trackHeader := TrackHeader{}
+		var trackHeader TrackHeader
 		if err := binary.Read(buffer, binary.BigEndian, &trackHeader); err != nil {
 			if err == io.EOF {
-				break
+				return allTracks.String(), nil
 			}
 			return "", err
 		}
@@ -105,41 +121,38 @@ func decodeTracks(buffer *bytes.Buffer) (string, error) {
 		trackName := make([]byte, trackHeader.NameLength)
 		buffer.Read(trackName)
 
-		measure := Measure{}
+		var measure Measure
 		if err := binary.Read(buffer, binary.BigEndian, &measure); err != nil {
 			if err == io.EOF {
-				break
+				return allTracks.String(), nil
 			}
 			return "", err
 		}
 
-		beats := fmtBeats(measure.Steps)
 		track := Track{
 			ID:    trackHeader.ID,
 			Name:  string(trackName),
-			Steps: beats,
+			Steps: fmtBeats(measure.Steps),
 		}
-		allTracks = fmt.Sprintf(`%s%s`, allTracks, track)
+		allTracks.WriteString(fmt.Sprint(track))
 	}
-
-	return allTracks, nil
 }
 
 // fmtBeats converts binary representation of the 16 step measure
-// pattern into a visualization showing when sound is triggered
+// pattern into a visualization showing when sound is triggered.
 func fmtBeats(steps [16]byte) string {
-	var beats = ""
+	var beats bytes.Buffer
 	for i := range steps {
 		switch steps[i] {
 		case 1:
 
-			// "x" represents sound output being triggered in a step
-			beats += "x"
+			// "x" represents sound output being triggered in a step.
+			beats.WriteString("x")
 		default:
 
-			// "-" represents no sound output being triggered in a step
-			beats += "-"
+			// "-" represents no sound output being triggered in a step.
+			beats.WriteString("-")
 		}
 	}
-	return beats
+	return beats.String()
 }
