@@ -11,11 +11,11 @@ import (
 	"strings"
 )
 
-// DrumHeader is the representation of the header of 
+// DrumHeader is the representation of the header of
 // the drum pattern describing the version and tempo.
 type DrumHeader struct {
 	Version [32]byte
-	Tempo float32
+	Tempo   float32
 }
 
 // String formats the return of the string
@@ -27,7 +27,7 @@ func (d DrumHeader) String() string {
 	)
 }
 
-// Header is the representation of the header of 
+// Header is the representation of the header of
 // the drum pattern describing the format and version.
 type Header struct {
 	Format  [14]byte
@@ -98,17 +98,16 @@ func decodeHeader(buffer *bytes.Buffer) (string, error) {
 
 	var d = DrumHeader{
 		Version: h.Version,
-		Tempo: t.Tempo,
+		Tempo:   t.Tempo,
 	}
 
 	return fmt.Sprint(d), nil
 }
 
-
 // decodeTracks decodes each track and appends
 // all tracks into a single string.
 func decodeTracks(buffer *bytes.Buffer) (string, error) {
-	var allTracks bytes.Buffer
+	var allTracks strings.Builder
 	for {
 		var trackHeader TrackHeader
 		if err := binary.Read(buffer, binary.BigEndian, &trackHeader); err != nil {
@@ -141,7 +140,7 @@ func decodeTracks(buffer *bytes.Buffer) (string, error) {
 // fmtBeats converts binary representation of the 16 step measure
 // pattern into a visualization showing when sound is triggered.
 func fmtBeats(steps [16]byte) string {
-	var beats bytes.Buffer
+	var beats strings.Builder
 	for i := range steps {
 		switch steps[i] {
 		case 1:
