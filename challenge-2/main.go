@@ -117,13 +117,13 @@ func decrypt(encMsg []byte, sr *secureReader) ([]byte, error) {
 // encrypt encrypts bytes using public-key cryptography.
 func encrypt(msg []byte, rPubKey, sPrivKey *[32]byte) ([]byte, error) {
 
-	// create a nonce to encrypt with.
+	// Create a nonce to encrypt with.
 	var nonce [24]byte
 	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 		return nil, err
 	}
 
-	// encrypt the message which appends the result to the nonce
+	// Encrypt the message which appends the result to the nonce
 	// in order to store the nonce with the encrypted message so that we
 	// can use the same nonce when its decrypted.
 	encrypted := box.Seal(nonce[:], msg, &nonce, rPubKey, sPrivKey)
@@ -206,7 +206,7 @@ func Serve(l net.Listener) error {
 	}
 	defer conn.Close()
 
-	// Generate a pub/private keypair.
+	// Generate a public/private encryption keypair for the server.
 	pub, priv, err := box.GenerateKey(rand.Reader)
 	if err != nil {
 		return fmt.Errorf("Error Serve GenKey: %v", err)
