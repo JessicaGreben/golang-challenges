@@ -12,110 +12,104 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
-// secureReader implements the io.Reader interface to decrypt encrypted bytes.
-type secureReader struct {
-	r    io.Reader
-	priv *[32]byte
-	pub  *[32]byte
+// SecureReader implements the io.Reader interface to decrypt encrypted bytes.
+type SecureReader struct {
+	io.Reader
+	privateKey [32]byte
+	publicKey  [32]byte
 }
 
-// NewSecureReader is a factory function for secureReader.
-func NewSecureReader(r io.Reader, priv, pub *[32]byte) io.Reader {
-	sr := secureReader{
-		r:    r,
-		priv: priv,
-		pub:  pub,
+// NewSecureReader is a factory function for SecureReader.
+func NewSecureReader(r io.Reader, privateKey, publicKey [32]byte) *SecureReader {
+	return &SecureReader{
+		Reader:     r,
+		privateKey: privateKey,
+		publicKey:  publicKey,
 	}
-	return &sr
 }
 
 // Read implements the io.Reader interface for secureReader to decrypt bytes.
-func (sr *secureReader) Read(p []byte) (int, error) {
-	dec, err := decrypt(p, sr)
+func (sr *SecureReader) Read(p []byte) (int, error) {
+	n, err := decrypt(p, sr)
 	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
+// decrypt decrypts bytes using public-key cryptography.
+func decrypt(p []byte, sr *SecureReader) (int, error) {
+
+	// Read the nonce.
+	var nonce [24]byte
+	n, err := io.ReadFull(sr.Reader, nonce[:])
+	if err != nil {
+		return 0, err
+	}
+
+	// Overhead is the number of bytes of overhead when
+	// encrypting a message therefore we need to create a
+	// buffer larger than just the encrypted message.
+	msg := make([]byte, len(p)+box.Overhead)
+
+	// Read the encrypted message.
+	n, err = sr.Reader.Read(msg)
+	if err != nil {
+		return 0, err
+	}
+
+	// The len and capacity of p will be set by the caller. On the call to
+	// box.Open the length value of p must be set to 0 since box. Open will
+	// append values to the slice. So by using p[:0] we are passing a slice
+	// value who's length is 0 but capacity represents the full size of the
+	// backing array. This will allow box.Open to use append to add the data
+	// during the decryption.
+
+	// box.Open will decypt the message and place just the decypted bytes back
+	// to the p slice. It will also return just those decypted bytes in the
+	// returned slice. We need the returned slice to get the length of bytes
+	// for this message. Because p will still have a larger length than what
+	// was appended from index 0.
+	dec, ok := box.Open(p[:0], msg[:n], &nonce, &sr.publicKey, &sr.privateKey)
+	if !ok {
 		return 0, err
 	}
 
 	return len(dec), nil
 }
 
-// secureWriter implements the io.Writer interface to encrypt bytes.
-type secureWriter struct {
-	w    io.Writer
-	priv *[32]byte
-	pub  *[32]byte
+// SecureWriter implements the io.Writer interface to encrypt bytes.
+type SecureWriter struct {
+	io.Writer
+	privateKey [32]byte
+	publicKey  [32]byte
 }
 
-// NewSecureWriter is a factory function for secureWriter.
-func NewSecureWriter(w io.Writer, priv, pub *[32]byte) io.Writer {
-	sw := secureWriter{
-		w:    w,
-		priv: priv,
-		pub:  pub,
+// NewSecureWriter is a factory function for SecureWriter.
+func NewSecureWriter(w io.Writer, privateKey, publicKey [32]byte) *SecureWriter {
+	return &SecureWriter{
+		Writer:     w,
+		privateKey: privateKey,
+		publicKey:  publicKey,
 	}
-	return &sw
 }
 
 // Write implements the io.Writer interface for secureWriter to encrypt bytes.
-func (sw *secureWriter) Write(p []byte) (int, error) {
-	enc, err := encrypt(p, sw.pub, sw.priv)
+func (sw *SecureWriter) Write(p []byte) (int, error) {
+	encryptedMsg, err := encrypt(p, sw.publicKey, sw.privateKey)
 	if err != nil {
 		return 0, err
 	}
 
-	sw.w.Write(enc)
+	// Write wants to know that we processed all the bytes in p,
+	// so we need to report that we did with len(p)
+	sw.Writer.Write(encryptedMsg)
 	return len(p), nil
 }
 
-// secureReadWriteCloser implements the ReadWriteCloser interface.
-type secureReadWriteCloser struct {
-	io.Reader
-	io.Writer
-	io.Closer
-}
-
-// newSecureReadWriteCloser is a factory function for secureReadWriteCloser.
-func newSecureReadWriteCloser(sr io.Reader, sw io.Writer, c io.Closer) secureReadWriteCloser {
-	srwc := secureReadWriteCloser{
-		sr,
-		sw,
-		c,
-	}
-	return srwc
-}
-
-// decrypt decrypts bytes using public-key cryptography.
-func decrypt(encMsg []byte, sr *secureReader) ([]byte, error) {
-
-	// Read the nonce.
-	var nonce [24]byte
-	n, err := io.ReadFull(sr.r, nonce[:])
-	if err != nil {
-		return nil, err
-	}
-
-	// Overhead is the number of bytes of overhead when
-	// encrypting a message therefor we need to create a
-	// buffer larger than just the encrypted message.
-	msg := make([]byte, len(encMsg)+box.Overhead)
-
-	// Read the encrypted message.
-	n, err = sr.r.Read(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Decrypt the message.
-	dec, ok := box.Open(encMsg[:0], msg[:n], &nonce, sr.pub, sr.priv)
-	if !ok {
-		return nil, err
-	}
-
-	return dec, nil
-}
-
 // encrypt encrypts bytes using public-key cryptography.
-func encrypt(msg []byte, rPubKey, sPrivKey *[32]byte) ([]byte, error) {
+func encrypt(p []byte, publicKey, privateKey [32]byte) ([]byte, error) {
 
 	// Create a nonce to encrypt with.
 	var nonce [24]byte
@@ -126,45 +120,48 @@ func encrypt(msg []byte, rPubKey, sPrivKey *[32]byte) ([]byte, error) {
 	// Encrypt the message which appends the result to the nonce
 	// in order to store the nonce with the encrypted message so that we
 	// can use the same nonce when its decrypted.
-	encrypted := box.Seal(nonce[:], msg, &nonce, rPubKey, sPrivKey)
-	return encrypted, nil
-}
-
-// reveiveKey is the receiveing side of a public key exchange over a
-// connection.
-func receiveKey(conn net.Conn) (*[32]byte, error) {
-	pubKey := make([]byte, 32)
-	if _, err := conn.Read(pubKey); err != nil {
-		return nil, err
-	}
-
-	// After reading pubKey bytes, format the pubKey
-	// into the desired array of 32 bytes format.
-	var fmtKey [32]byte
-	copy(fmtKey[:], pubKey)
-	return &fmtKey, nil
+	encryptedMsg := box.Seal(nonce[:], p, &nonce, &publicKey, &privateKey)
+	return encryptedMsg, nil
 }
 
 // Perform a pubic key exchange over the connection.
-func handshake(conn net.Conn, sKey *[32]byte) (*[32]byte, error) {
+func handshake(conn net.Conn, senderKey [32]byte) ([32]byte, error) {
+	var receiverKey [32]byte
 
 	// Send the public key.
-	if _, err := conn.Write(sKey[:]); err != nil {
-		return nil, err
+	if _, err := conn.Write(senderKey[:]); err != nil {
+		return receiverKey, err
 	}
 
 	// Recieve the public key from the other side
 	// of the connection.
-	rKey, err := receiveKey(conn)
-	if err != nil {
-		return nil, err
+	if _, err := conn.Read(receiverKey[:]); err != nil {
+		return receiverKey, err
 	}
-	return rKey, nil
+
+	return receiverKey, nil
+}
+
+// SecureConn provides secure read and write over a connection.
+type SecureConn struct {
+	net.Conn
+	*SecureReader // Read method is promoting up.
+	*SecureWriter // Write method is promoting up.
+}
+
+// Read adds a secure read that decrypts messages before reading.
+func (sc *SecureConn) Read(p []byte) (int, error) {
+	return sc.SecureReader.Read(p)
+}
+
+// Write adds a secure write that encrypts messages before writing.
+func (sc *SecureConn) Write(p []byte) (int, error) {
+	return sc.SecureWriter.Write(p)
 }
 
 // Dial connects to the server over a secure connections which encrypts and
 // decrypts all read and write bytes.
-func Dial(addr string) (io.ReadWriteCloser, error) {
+func Dial(addr string) (net.Conn, error) {
 
 	// Connect to server.
 	conn, err := net.Dial("tcp", addr)
@@ -173,27 +170,29 @@ func Dial(addr string) (io.ReadWriteCloser, error) {
 	}
 
 	// Generate a public/private encryption keypair for the client.
-	pub, clientPrivKey, err := box.GenerateKey(rand.Reader)
+	// GenerateKey is using pointer semantics for the keys. We want to
+	// use value sematics. We think it is the right semantic for this data.
+	clientPublicKey, clientPrivateKey, err := box.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 
 	// Perform a public encryption key exchange to
 	// get the servers' public encryption key.
-	serverPubKey, err := handshake(conn, pub)
+	serverPublicKey, err := handshake(conn, *clientPublicKey)
 	if err != nil {
 		return nil, err
 	}
 
 	// Wrap the connection with a secure reader and secure writer
 	// which will encrypt/decrypt all read/writes.
-	secureConn := newSecureReadWriteCloser(
-		NewSecureReader(conn, clientPrivKey, serverPubKey),
-		NewSecureWriter(conn, clientPrivKey, serverPubKey),
-		conn,
-	)
+	sc := SecureConn{
+		Conn:         conn,
+		SecureReader: NewSecureReader(conn, *clientPrivateKey, serverPublicKey),
+		SecureWriter: NewSecureWriter(conn, *clientPrivateKey, serverPublicKey),
+	}
 
-	return secureConn, nil
+	return &sc, nil
 }
 
 // Serve starts a secure echo server on the given listener.
@@ -207,25 +206,26 @@ func Serve(l net.Listener) error {
 	defer conn.Close()
 
 	// Generate a public/private encryption keypair for the server.
-	pub, priv, err := box.GenerateKey(rand.Reader)
+	serverPublicKey, serverPrivateKey, err := box.GenerateKey(rand.Reader)
 	if err != nil {
 		return fmt.Errorf("Error Serve GenKey: %v", err)
 	}
 
 	// Perform a public encryption key exchange to
 	// get the client's public encryption key.
-	clientPubKey, err := handshake(conn, pub)
+	clientPubKey, err := handshake(conn, *serverPublicKey)
 	if err != nil {
 		return fmt.Errorf("Error Serve handshake: %v", err)
 	}
 
-	sw := NewSecureWriter(conn, priv, clientPubKey)
-	sr := NewSecureReader(conn, priv, clientPubKey)
+	// Construct the secure reader and writer. We have to convert the keys
+	// from pointer to value semantics for our code base.
+	sw := NewSecureWriter(conn, *serverPrivateKey, clientPubKey)
+	sr := NewSecureReader(conn, *serverPrivateKey, clientPubKey)
 
 	// Echo the data back to the client over a secure
 	// connection that encrypts and decrypts all reads/writes.
-	_, err = io.Copy(sw, sr)
-	if err != nil {
+	if _, err = io.Copy(sw, sr); err != nil {
 		return fmt.Errorf("Error io.Copy: %v", err)
 	}
 
