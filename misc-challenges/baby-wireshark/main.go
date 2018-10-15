@@ -239,12 +239,12 @@ func readSegment(buffer *bytes.Buffer) (segmentHeader, error) {
 
 func createFile(httpOrder map[int][]byte) error {
 
-	// Sort the keys of the sequence numbers.
-	var keys []int
+	// Sort the values of the TCP sequence numbers.
+	var sequenceNums []int
 	for k := range httpOrder {
-		keys = append(keys, k)
+		sequenceNums = append(sequenceNums, k)
 	}
-	sort.Ints(keys)
+	sort.Ints(sequenceNums)
 
 	f, err := os.Create("./packet.jpeg")
 	if err != nil {
@@ -253,7 +253,7 @@ func createFile(httpOrder map[int][]byte) error {
 	defer f.Close()
 
 	// Write the HTTP data in order to a jpeg.
-	for _, k := range keys {
+	for _, k := range sequenceNums {
 		data := httpOrder[k]
 		f.Write(data)
 	}
