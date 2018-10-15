@@ -22,7 +22,7 @@ type globalHeader struct {
 	LinkLayerHeader [4]byte
 }
 
-// pcap per-packet header.
+// Pcap per-packet header.
 type packetHeader struct {
 	TimestampSec       [4]byte
 	TimestampMs        [4]byte
@@ -30,7 +30,7 @@ type packetHeader struct {
 	OriginalPacketSize uint32
 }
 
-// per packet link layer frame header. Layer 2 Ethernet frame.
+// Per packet link layer frame header. Layer 2 Ethernet frame.
 // ref: https://en.wikipedia.org/wiki/Ethernet_frame#Structure
 type frameHeader struct {
 	DestAddr   [6]byte
@@ -38,7 +38,7 @@ type frameHeader struct {
 	EtherType  uint16
 }
 
-// per packet IP layer datagram header.
+// Per packet IP layer datagram header.
 // ref: https://tools.ietf.org/html/rfc791#page-11
 type datagramHeader struct {
 	Version        uint8
@@ -53,7 +53,7 @@ type datagramHeader struct {
 	Dest           [4]byte
 }
 
-// per packet transport layer segment header.
+// Per packet transport layer segment header.
 // ref: https://tools.ietf.org/html/rfc793#section-3.1
 type segmentHeader struct {
 	SourcePort uint16
@@ -90,7 +90,7 @@ func main() {
 		fmt.Print(err)
 	}
 
-	// this mapping is the tcp sequence number to http payload bytes
+	// This mapping is the tcp sequence number to http payload bytes
 	// so that we can reassemble the bytes in the correct order.
 	httpData := make(map[int][]byte)
 
@@ -186,6 +186,8 @@ func readPacHeader(buffer *bytes.Buffer) (packetHeader, error) {
 		fmt.Print("binary.Read err: ", err)
 	}
 
+	// This won't always be the case, but for this file we know that the packet
+	// size is the same as the original size. I.e. the packet is never trucated.
 	if int(pacHeader.PacketSize) != int(pacHeader.OriginalPacketSize) {
 		return pacHeader, fmt.Errorf("Error! pcap pac header is wrong. Expected %d, but got %d.", pacHeader.PacketSize, pacHeader.OriginalPacketSize)
 	}
@@ -197,6 +199,8 @@ func readFrame(buffer *bytes.Buffer) error {
 	if err := binary.Read(buffer, binary.BigEndian, &frame); err != nil {
 		return err
 	}
+
+	// We know that the ether type is 8, indicating protocol IPv4 for the payload.
 	if frame.EtherType != 8 {
 		return fmt.Errorf("Error! EtherType is incorrect. Should be 8, but got %d\n", frame.EtherType)
 	}
@@ -218,13 +222,15 @@ func readDatagram(buffer *bytes.Buffer) (datagramHeader, error) {
 }
 
 func readSegment(buffer *bytes.Buffer) (segmentHeader, error) {
-	// Read the TCP segment header.
 	segment := segmentHeader{}
 	if err := binary.Read(buffer, binary.BigEndian, &segment); err != nil {
 		return segment, err
 	}
 
 	tcpHeader := 4 * int(segment.DataOffset[0]>>4)
+
+	// We only read in 13 bytes so far, but the segment header is bigger then that,
+	// so we need to read the rest of it.
 	readTheRestTcp := tcpHeader - 13
 	buffer.Read(make([]byte, readTheRestTcp))
 
@@ -232,6 +238,8 @@ func readSegment(buffer *bytes.Buffer) (segmentHeader, error) {
 }
 
 func createFile(httpOrder map[int][]byte) error {
+
+	// Sort the keys of the sequence numbers.
 	var keys []int
 	for k := range httpOrder {
 		keys = append(keys, k)
@@ -244,12 +252,14 @@ func createFile(httpOrder map[int][]byte) error {
 	}
 	defer f.Close()
 
+	// Write the HTTP data in order to a jpeg.
 	for _, k := range keys {
 		data := httpOrder[k]
 		f.Write(data)
 	}
 	f.Sync()
 
+	// Open the jpeg that was created.
 	if err := exec.Command("/usr/bin/open", "./packet.jpeg").Run(); err != nil {
 		return err
 	}
