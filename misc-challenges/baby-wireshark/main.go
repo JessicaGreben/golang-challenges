@@ -10,7 +10,7 @@ import (
 	"sort"
 )
 
-// The pcap file global header.
+// globalHeader is the pcap file global header.
 // ref: https://www.tcpdump.org/manpages/pcap-savefile.5.txt
 type globalHeader struct {
 	MagicNumber     [4]byte
@@ -22,7 +22,7 @@ type globalHeader struct {
 	LinkLayerHeader [4]byte
 }
 
-// Pcap per-packet header.
+// packetHeader is the pcap per-packet header.
 type packetHeader struct {
 	TimestampSec       [4]byte
 	TimestampMs        [4]byte
@@ -30,7 +30,7 @@ type packetHeader struct {
 	OriginalPacketSize uint32
 }
 
-// Per packet link layer frame header. Layer 2 Ethernet frame.
+// frameHeader is the per packet link layer frame header. Layer 2 Ethernet frame.
 // ref: https://en.wikipedia.org/wiki/Ethernet_frame#Structure
 type frameHeader struct {
 	DestAddr   [6]byte
@@ -38,7 +38,7 @@ type frameHeader struct {
 	EtherType  uint16
 }
 
-// Per packet IP layer datagram header.
+// datagramHeader is the per packet IP layer datagram header.
 // ref: https://tools.ietf.org/html/rfc791#page-11
 type datagramHeader struct {
 	Version        uint8
@@ -53,7 +53,7 @@ type datagramHeader struct {
 	Dest           [4]byte
 }
 
-// Per packet transport layer segment header.
+// segmentHeader is the per packet transport layer segment header.
 // ref: https://tools.ietf.org/html/rfc793#section-3.1
 type segmentHeader struct {
 	SourcePort uint16
@@ -229,7 +229,7 @@ func readSegment(buffer *bytes.Buffer) (segmentHeader, error) {
 
 	tcpHeader := 4 * int(segment.DataOffset[0]>>4)
 
-	// We only read in 13 bytes so far, but the segment header is bigger then that,
+	// We only read in 13 bytes so far, but the segment header is bigger than that,
 	// so we need to read the rest of it.
 	readTheRestTcp := tcpHeader - 13
 	buffer.Read(make([]byte, readTheRestTcp))
@@ -252,14 +252,14 @@ func createFile(httpOrder map[int][]byte) error {
 	}
 	defer f.Close()
 
-	// Write the HTTP data in order to a jpeg.
+	// Write the HTTP data in order to a jpeg file.
 	for _, k := range sequenceNums {
 		data := httpOrder[k]
 		f.Write(data)
 	}
 	f.Sync()
 
-	// Open the jpeg that was created.
+	// Open the jpeg that was created. This assumes mac OSX.
 	if err := exec.Command("/usr/bin/open", "./packet.jpeg").Run(); err != nil {
 		return err
 	}
