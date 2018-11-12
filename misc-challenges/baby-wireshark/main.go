@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"sort"
@@ -68,10 +69,9 @@ type segmentHeader struct {
 }
 
 func main() {
-
-	data, err := readPacCapture()
+	data, err := ioutil.ReadFile("./net.cap")
 	if err != nil {
-		fmt.Printf("pacCaptureData err: %v\n", err)
+		fmt.Printf("ioutil.ReadFile err: %v\n", err)
 		return
 	}
 
@@ -102,27 +102,6 @@ func main() {
 
 	// Create a file from the httpData and open that file.
 	createFile(httpData)
-}
-
-func readPacCapture() ([]byte, error) {
-	fd, err := os.Open("./net.cap")
-	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-
-	fi, err := os.Stat("./net.cap")
-	if err != nil {
-		return nil, err
-	}
-
-	// Read the entire contents of the file.
-	data := make([]byte, int(fi.Size()))
-	if _, err := fd.Read(data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 func readPacket(buffer *bytes.Buffer, httpOrder map[int][]byte) (map[int][]byte, error) {
