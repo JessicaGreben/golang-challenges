@@ -10,6 +10,10 @@ import (
 	"sort"
 )
 
+const linkTypeEthernet = 1
+const ipv4Ethertype = 8
+const protocolNumberTCP = 6
+
 // globalHeader is the pcap file global header.
 // ref: https://www.tcpdump.org/manpages/pcap-savefile.5.txt
 type globalHeader struct {
@@ -65,21 +69,10 @@ type segmentHeader struct {
 
 func main() {
 
-	fd, err := os.Open("./net.cap")
+	data, err := readPacCapture()
 	if err != nil {
-		fmt.Print(err)
-	}
-	defer fd.Close()
-
-	fi, err := os.Stat("./net.cap")
-	if err != nil {
-		fmt.Print(err)
-	}
-
-	// Read the entire contents of the file.
-	data := make([]byte, int(fi.Size()))
-	if _, err := fd.Read(data); err != nil {
-		fmt.Print(err)
+		fmt.Printf("pacCaptureData err: %v\n", err)
+		return
 	}
 
 	// Place raw bytes into the buffer for processing.
@@ -87,7 +80,8 @@ func main() {
 
 	// Read the pcap-savefile global header.
 	if err := readGlobalHeader(buffer); err != nil {
-		fmt.Print(err)
+		fmt.Printf("readGlobalHeader err: %v\n", err)
+		return
 	}
 
 	// This mapping is the tcp sequence number to http payload bytes
@@ -101,13 +95,34 @@ func main() {
 			if err == io.EOF {
 				break
 			}
-			fmt.Print(err)
+			fmt.Printf("readPacket err: %v\n", err)
 			return
 		}
 	}
 
 	// Create a file from the httpData and open that file.
 	createFile(httpData)
+}
+
+func readPacCapture() ([]byte, error) {
+	fd, err := os.Open("./net.cap")
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	fi, err := os.Stat("./net.cap")
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the entire contents of the file.
+	data := make([]byte, int(fi.Size()))
+	if _, err := fd.Read(data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func readPacket(buffer *bytes.Buffer, httpOrder map[int][]byte) (map[int][]byte, error) {
@@ -170,8 +185,8 @@ func readGlobalHeader(buffer *bytes.Buffer) error {
 
 	// Make sure link layer header is Ethernet.
 	// ref: https://www.tcpdump.org/linktypes.html
-	if globalHeader.LinkLayerHeader[0] != 1 {
-		return fmt.Errorf("Expected link layer header to be Ethernet, but got %d instead.", globalHeader.LinkLayerHeader)
+	if globalHeader.LinkLayerHeader[0] != linkTypeEthernet {
+		return fmt.Errorf("wrong link layer header. Expected 1, but got %d", globalHeader.LinkLayerHeader)
 	}
 
 	return nil
@@ -183,13 +198,13 @@ func readPacHeader(buffer *bytes.Buffer) (packetHeader, error) {
 		if err == io.EOF {
 			return pacHeader, err
 		}
-		fmt.Print("binary.Read err: ", err)
+		return pacHeader, err
 	}
 
 	// This won't always be the case, but for this file we know that the packet
 	// size is the same as the original size. I.e. the packet is never trucated.
-	if int(pacHeader.PacketSize) != int(pacHeader.OriginalPacketSize) {
-		return pacHeader, fmt.Errorf("Error! pcap pac header is wrong. Expected %d, but got %d.", pacHeader.PacketSize, pacHeader.OriginalPacketSize)
+	if pacHeader.PacketSize != pacHeader.OriginalPacketSize {
+		return pacHeader, fmt.Errorf("wrong pcap pac header. Expected %d, but got %d", pacHeader.PacketSize, pacHeader.OriginalPacketSize)
 	}
 	return pacHeader, nil
 }
@@ -201,8 +216,8 @@ func readFrame(buffer *bytes.Buffer) error {
 	}
 
 	// We know that the ether type is 8, indicating protocol IPv4 for the payload.
-	if frame.EtherType != 8 {
-		return fmt.Errorf("Error! EtherType is incorrect. Should be 8, but got %d\n", frame.EtherType)
+	if frame.EtherType != ipv4Ethertype {
+		return fmt.Errorf("wrong etherType. Expected 8, but got %d", frame.EtherType)
 	}
 	return nil
 }
@@ -214,8 +229,8 @@ func readDatagram(buffer *bytes.Buffer) (datagramHeader, error) {
 	}
 
 	// Make sure the protocol is 6 for TCP.
-	if datagram.Protocol != 6 {
-		return datagram, fmt.Errorf("IP Protocol should be 6, but it is actially %d\n", datagram.Protocol)
+	if datagram.Protocol != protocolNumberTCP {
+		return datagram, fmt.Errorf("wrong IP Protocol. Expected 6, but got %d", datagram.Protocol)
 	}
 
 	return datagram, nil
@@ -231,8 +246,8 @@ func readSegment(buffer *bytes.Buffer) (segmentHeader, error) {
 
 	// We only read in 13 bytes so far, but the segment header is bigger than that,
 	// so we need to read the rest of it.
-	readTheRestTcp := tcpHeader - 13
-	buffer.Read(make([]byte, readTheRestTcp))
+	readTheRestTCP := tcpHeader - 13
+	buffer.Read(make([]byte, readTheRestTCP))
 
 	return segment, nil
 }
