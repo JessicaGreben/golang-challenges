@@ -1,12 +1,6 @@
 // Cracking the Coding Interview - Chapter 1 Arrays and Strings
 
-package main
-
-import (
-	"sort"
-)
-
-func main() {}
+package arrays
 
 // 1.1 Is Unique
 // Determine if a string has all unique characters. What if you cannot use
@@ -41,36 +35,4 @@ func solutionOneB(str string) (bool, error) {
 	}
 
 	return true, nil
-}
-
-// Solution 3 (with additional data structure)
-// Time: sort O(n log n)
-// Space complexity: O(len(str))
-func solutionOneC(str string) (bool, error) {
-
-	// sort characters.
-	s := []rune(str)
-	sort.Sort(sortRunes(s))
-
-	// compare neighboring chars for similarity.
-	for i := 0; i < len(s)-1; i++ {
-		if s[i] == s[i+1] {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
-type sortRunes []rune
-
-func (s sortRunes) Less(i, j int) bool {
-	return s[i] < s[j]
-}
-
-func (s sortRunes) Len() int {
-	return len(s)
-}
-func (s sortRunes) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
 }
