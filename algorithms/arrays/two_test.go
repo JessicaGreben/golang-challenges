@@ -24,3 +24,9 @@ func TestIsPermutation(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkPerm(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		isPermutation("cba", "bac")
+	}
+}

@@ -7,7 +7,7 @@ package arrays
 // additional data structures?
 
 // Solution 1 (with additional data structure).
-// Time: O(n)
+// Time complexity: O(n)
 // Space complexity: O(n)
 func solutionOneA(str string) (bool, error) {
 	count := map[rune]int{}

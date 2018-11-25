@@ -35,3 +35,29 @@ func TestSolutionOneB(t *testing.T) {
 		})
 	}
 }
+
+func benchmarkOneA(str string, b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		solutionOneA(str)
+	}
+}
+
+func BenchmarkOneA1(b *testing.B)  { benchmarkOneA("a", b) }
+func BenchmarkOneA2(b *testing.B)  { benchmarkOneA("ab", b) }
+func BenchmarkOneA3(b *testing.B)  { benchmarkOneA("abcd", b) }
+func BenchmarkOneA10(b *testing.B) { benchmarkOneA("abcdefghij", b) }
+func BenchmarkOneA20(b *testing.B) { benchmarkOneA("abcdefghijklmnopqrst", b) }
+func BenchmarkOneA40(b *testing.B) { benchmarkOneA("abcdefghijklmnopqrstuvwxyz0123456789àáâä", b) }
+
+func benchmarkOneB(str string, b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		solutionOneB(str)
+	}
+}
+
+func BenchmarkOneB1(b *testing.B)  { benchmarkOneB("a", b) }
+func BenchmarkOneB2(b *testing.B)  { benchmarkOneB("ab", b) }
+func BenchmarkOneB3(b *testing.B)  { benchmarkOneB("abcd", b) }
+func BenchmarkOneB10(b *testing.B) { benchmarkOneB("abcdefghij", b) }
+func BenchmarkOneB20(b *testing.B) { benchmarkOneB("abcdefghijklmnopqrst", b) }
+func BenchmarkOneB40(b *testing.B) { benchmarkOneB("abcdefghijklmnopqrstuvwxyz0123456789àáâä", b) }

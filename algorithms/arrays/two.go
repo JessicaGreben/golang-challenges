@@ -2,7 +2,7 @@ package arrays
 
 import "sort"
 
-// Solution
+// Cracking the Coding Interview - 1.2 Check Permutation
 // Time: nlogn
 // Space complexity: O(n)
 func isPermutation(str1, str2 string) bool {
