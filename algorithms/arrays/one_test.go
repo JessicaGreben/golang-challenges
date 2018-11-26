@@ -17,7 +17,7 @@ var cases = []struct {
 func TestSolutionOneA(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			b, _ := solutionOneA(c.input)
+			b := solutionOneA(c.input)
 			if b != c.output {
 				t.Errorf("Expected: %v, Actual: %v\n.", c.output, b)
 			}
@@ -28,7 +28,7 @@ func TestSolutionOneA(t *testing.T) {
 func TestSolutionOneB(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			b, _ := solutionOneB(c.input)
+			b := solutionOneB(c.input)
 			if b != c.output {
 				t.Errorf("Expected: %v, Actual: %v\n.", c.output, b)
 			}
