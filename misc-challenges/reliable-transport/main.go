@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
-	"time"
 )
 
 func main() {
@@ -27,8 +29,14 @@ func main() {
 
 func server() error {
 
+	addr := net.UDPAddr{
+		IP:   []byte{127, 0, 0, 1},
+		Port: 1337,
+	}
+
 	// Listen for incoming UDP packets.
-	conn, err := net.ListenPacket("udp", "localhost:1337")
+	conn, err := net.ListenUDP("udp", &addr)
+	// conn, err := net.ListenPacket("udp", "localhost:1337")
 	if err != nil {
 		return err
 	}
@@ -37,81 +45,135 @@ func server() error {
 
 	for {
 		buffer := make([]byte, 4096)
-		n, addr, err := conn.ReadFrom(buffer)
+		// n, addr, err := conn.ReadFrom(buffer)
+		// n, addr, err := conn.ReadFromUDP(buffer)
+		oob := make([]byte, 1024)
+		n, on, _, addr, err := conn.ReadMsgUDP(buffer, oob)
 		if err != nil {
+			// if io.EOF
 			return err
 		}
 
 		// Process UDP packet.
-		process(buffer[:n])
+		fmt.Printf("length of oob: %d\n", on)
+		fmt.Printf("string: %s\n", buffer[:n])
+		ID := buffer[:9]
+		// ID, err := process(buffer[:n])
+		// if err != nil {
+		// 	fmt.Print(err)
+		// }
 
 		// ACK response.
-		conn.WriteTo([]byte("ACK from server."), addr)
+		resp := fmt.Sprintf("ACK: %d", ID)
+		conn.WriteTo([]byte(resp), addr)
 	}
 }
 
-func process(packetUDP []byte) {
-	fmt.Printf("Payload received: %s", packetUDP)
-	// read header
-	// headers, payload := readHeadersUDP(packetUDP)
-	// checksum header
+func process(packet []byte) (uint64, error) {
+	fmt.Printf("Payload received: %v\n", packet)
+
+	r := bytes.NewReader(packet)
+	p := packetRUDP{}
+	err := binary.Read(r, binary.BigEndian, &p)
+	fmt.Printf("String: %#v\n", p)
+
+	if err != nil {
+		return 0, err
+	}
+	return p.ID, nil
 }
 
 func client(port int) error {
 
-	n := net.UDPAddr{
+	addr := net.UDPAddr{
 		IP:   []byte{127, 0, 0, 1},
 		Port: port,
 	}
 
 	// Connect UDP.
-	conn, err := net.DialUDP("udp", nil, &n)
+	conn, err := net.DialUDP("udp", nil, &addr)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	sendPacketUDP(conn)
+	packet := fmt.Sprintf("%d: Packet payload.", rand.Uint64())
+	fmt.Printf("Sending packet: %s\n", packet)
+	_, err = conn.Write([]byte(packet))
+	if err != nil {
+		return err
+	}
 
-	waitForACK(conn, n)
-	// buffer := make([]byte, 1024)
-	// conn.Read(buffer)
-	// fmt.Printf("buf: %v\n", buffer)
-	timeout()
+	buffer := make([]byte, 1024)
+	n, _, _, _, err := conn.ReadMsgUDP(buffer, nil)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Read ACK: %s\n", buffer[:n])
 
 	return nil
 }
 
-func sendPacketUDP(conn *net.UDPConn) {
-	payload := []byte("Payload from client.\n")
-	msg := addHeadersUDP(payload)
-	conn.WriteMsgUDP(msg, nil, nil)
-}
+// func waitingForACK(conn *net.UDPConn) bool {
+// 	// TODO: start timer to listen for an ACK.
+// 	t := time.NewTimer(2 * time.Second)
+// 	buffer := make([]byte, 1024)
+// 	n, _, _, _, _ := conn.ReadMsgUDP(buffer, nil)
+// 	// conn.Read(buffer[:n])
+// 	// Resend if timeout is reached.
+// 	tStop := t.Stop()
+// 	if tStop {
+// 		return false
+// 	}
+// 	return true
+// }
 
-func addHeadersUDP(payload []byte) []byte {
-	return payload
-}
-
-func waitForACK(conn *net.UDPConn) {
-	buffer := make([]byte, 1024)
-	n, _, _ := conn.ReadMsgUDP(buffer)
-	conn.Read
-	// TODO: start timer to listen for an ACK.
-	// Resend if timeout is reached.
-
-}
-
-func timeout() {
-	timer1 := time.NewTimer(2 * time.Second)
-	go func() {
-		<-timer1.C
-		fmt.Println("Timer expired: No ACK")
-	}()
-}
+// func timeout() {
+// 	timer1 := time.NewTimer(2 * time.Second)
+// 	go func() {
+// 		<-timer1.C
+// 		fmt.Println("Timer expired: No ACK")
+// 	}()
+// }
 
 type packetRUDP struct {
-	headers [2]byte
-	data    [1]byte
+	ID   uint64
+	Data [1]byte
 }
 
-type headersRUDP struct{}
+type headersRUDP struct {
+	ID     uint64
+	Length uint16
+}
+
+// func (p packetRUDP) send(conn *net.UDPConn) {
+// 	var arr [1]byte
+// 	copy(arr[:], "abc")
+// 	p.Data = arr
+// 	p.addHeaders()
+
+// 	enc := gob.NewEncoder(conn)
+// 	err := enc.Encode(p)
+// 	if err != nil {
+// 		fmt.Println("encode error:", err)
+// 		return
+// 	}
+
+// buf := new(bytes.Buffer)
+// err := binary.Write(buf, binary.BigEndian, &p)
+
+// if err != nil {
+// 	fmt.Println("binary.Write failed:", err)
+// 	return
+// }
+// err := binary.Read(r, binary.BigEndian, &p)
+
+// conn.WriteMsgUDP(, nil, nil)
+// }
+
+// func (p packetRUDP) addHeaders() {
+// 	p.ID = rand.Uint64()
+// 	p.Length = uint16(len(p.Data))
+// 	fmt.Printf("ID: %d\n", p.ID)
+// 	fmt.Printf("length of data is: %d\n", p.Length)
+// }
