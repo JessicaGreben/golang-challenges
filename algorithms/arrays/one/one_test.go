@@ -47,26 +47,35 @@ func getLongStr(n int) string {
 	return string(runes)
 }
 
-func benchmarkSolutionOneA(s string, b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		solutionOneA(s)
+var benchCases = []struct {
+	name   string
+	input  string
+	output bool
+}{
+	{name: "1", input: getLongStr(1e2)},
+	{name: "2", input: getLongStr(1e3)},
+	{name: "3", input: getLongStr(1e4)},
+	{name: "4", input: getLongStr(1e5)},
+}
+
+func BenchmarkSolutionOneA(b *testing.B) {
+	for _, c := range benchCases {
+		b.Run(c.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				solutionOneA(c.input)
+			}
+		})
 	}
 }
 
-func BenchmarkSolutionOneA1e2(b *testing.B) { benchmarkSolutionOneA(getLongStr(1e2), b) }
-func BenchmarkSolutionOneA1e3(b *testing.B) { benchmarkSolutionOneA(getLongStr(1e3), b) }
-func BenchmarkSolutionOneA1e4(b *testing.B) { benchmarkSolutionOneA(getLongStr(1e4), b) }
-func BenchmarkSolutionOneA1e5(b *testing.B) { benchmarkSolutionOneA(getLongStr(1e5), b) }
-
-func benchmarkSolutionOneB(s string, b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		solutionOneB(s)
+func BenchmarkSolutionOneB(b *testing.B) {
+	for _, c := range benchCases {
+		b.Run(c.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				solutionOneB(c.input)
+			}
+		})
 	}
 }
-
-func BenchmarkSolutionOneB1e2(b *testing.B) { benchmarkSolutionOneB(getLongStr(1e2), b) }
-func BenchmarkSolutionOneB1e3(b *testing.B) { benchmarkSolutionOneB(getLongStr(1e3), b) }
-func BenchmarkSolutionOneB1e4(b *testing.B) { benchmarkSolutionOneB(getLongStr(1e4), b) }
-func BenchmarkSolutionOneB1e5(b *testing.B) { benchmarkSolutionOneB(getLongStr(1e5), b) }
