@@ -34,14 +34,26 @@ func TestUrlify2(t *testing.T) {
 	}
 }
 
+func getLongStr(n int) string {
+	runes := make([]rune, n)
+	for i := 0; i < n; i++ {
+		runes[i] = rune(' ')
+	}
+	return string(runes)
+}
+
 func BenchmarkUrlify(b *testing.B) {
+	str := getLongStr(1000)
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		urlify("Hello world, it is a wonderful day and great week.           ")
+		urlify(str)
 	}
 }
 
 func BenchmarkUrlify2(b *testing.B) {
+	str := getLongStr(1000)
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		urlify2("Hello world, it is a wonderful day and great week.          ")
+		urlify2(str)
 	}
 }

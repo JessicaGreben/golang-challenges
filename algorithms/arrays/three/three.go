@@ -14,13 +14,15 @@ func urlify(str string) string {
 func urlify2(str string) string {
 	var sb strings.Builder
 
+	const space = rune(' ')
+	const urlSpace = "%20"
 	for _, v := range str {
-		if v == rune(' ') {
-			sb.WriteString("%20")
-		} else {
-			// sb.WriteRune(v)
-			sb.WriteString(string(v))
+		if v == space {
+			sb.WriteString(urlSpace)
+			continue
 		}
+		sb.WriteRune(v)
 	}
+
 	return sb.String()
 }
