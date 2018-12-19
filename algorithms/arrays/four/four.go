@@ -9,43 +9,35 @@ func permPalin(str string) bool {
 		return true
 	}
 
-	// Create a hash map that will store the frequency that each character occurs.
+	// Create a map of runes and the number of times they occur.
 	count := make(map[rune]int)
-
-	// Keep track if all the characters occur an even number of times.
-	allCharsEven := false
-
-	// Keep track of how many characters occur an odd number of times.
-	totalOdd := 0
-
 	for _, v := range str {
-
-		// If the occurence frequency of the current character is odd,
-		//
-		if count[v]%2 == 1 {
-			allCharsEven = true
-			totalOdd--
-
-			// If the occurence frequency of the current character is even,
-		} else {
-			allCharsEven = false
-			totalOdd++
-		}
-
 		count[v]++
 	}
 
-	// If the length of the string is even, then all characters must occur an
-	// even number of times to be a palindrome.
-	if len(str)%2 == 0 {
-		return allCharsEven
-	}
+	const even = 0
+	const odd = 1
+	switch len(str) % 2 {
+	case even:
+		for _, v := range count {
 
-	// If the length of the string is odd, then only one character can occur an odd
-	// number of times. All other characters must occur an even number of times.
-	if totalOdd > 1 {
-		return false
-	}
+			// All values must be even to be a permutation of a palindrome.
+			if v%2 != even {
+				return false
+			}
+		}
+	case odd:
+		var countOdd int
+		for _, v := range count {
 
+			// All values must be even except one can be odd.
+			if v%2 != even {
+				countOdd++
+				if countOdd > 1 {
+					return false
+				}
+			}
+		}
+	}
 	return true
 }
